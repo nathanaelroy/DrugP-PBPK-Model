@@ -1,0 +1,428 @@
+# Generated from MCDrugP.csl by acsl2r v0.4.0 on 2018-07-06T13:37:02.427Z
+
+# Review the following before use!
+
+# Definition is VPlasma. Found and corrected: Vplasma.
+
+# Help improve this tool: please submit faults you find to
+# https://github.com/acsl2r/acsl2r/issues
+
+#pragma exec run_model parameters
+
+if (!require(deSolve))
+{
+  stop("The deSolve package is required. Please install it.")
+}
+
+# INITIAL
+
+assign_parameters = function()
+{
+  # code that is executed once at the beginning of a simulation run goes here
+
+  # Constants for log-normally distributed blood flow
+  BW <- 60 #@p
+
+  # Parameters for tissue binding, association/disociation rate constants
+  KALiver <- 312 #@p 6.921125e+00 !Association rate constant for liver
+
+  KDLiver <- 6.1e-4 #@p 6.131478e-17 !Disociation rate constant for liver
+
+  BMAXLivC <- 203704 #@p !385000 !Maximal Liver capacity
+
+  KAS <- 40 #@p !2.916667e-01 !Association rate for slowly perfused tissue
+
+  KDS <- 0.03 #@p !3.166667e-02 !Disociation rate constant for slowly perfused tissue
+
+  BMAXSC <- 2142 #@p 3300 !Maximal slowly perfused capacity
+
+  KAR <- 0.2 #@p !3.393341e-02 !Association rate for richly perfused tissue
+
+  KDR <- 40 #@p 4.492256e-01 !Disociation rate constant for richly perfused tissue
+
+  BMAXRC <- 8783 #@p !166000 !Maximal richly perfused capacity
+
+  # Parameter for unbound percentage of drug
+  Funbound <- 0.31 #@p Drugbank suggests 69% will be bound
+
+  # Uptake from IV
+  # metabolism in the liver we might decide to use M-M equation to deal with metabolism
+  # !CONSTANT KmLiver = 147 !(UNITS)
+  # !CONSTANT VmaxLiverC = 147 !UNITS/H/BW^.75
+  # dosing parameters
+
+  # iv dosing in microg/kg
+  IVdoseC <- 3800 #@p (microg/kg) |IV dose
+
+  TSTOP <- 24 #@p (h) Simulation Period
+
+  tlen <- 2 #@p (h) length of iv infusion
+
+  tstart <- 0 #@p delay time for start of dosing
+
+  CINT <- 0.1 #@p
+  
+  # !blood flow constants
+  QCC <- 15.87 # L/h/kg^.75 Cardiac output
+  
+  QLiverC <- 0.194  # Fractional blood flow to liver (unscaled)
+  
+  QSC <- 0.24  # Fractional blood flow to the slowly perfused (unscaled)
+  
+  QRC <- (0.76 - QLiverC)  # Fractional blood flow to the richly perfused tissue (unscaled)
+  
+  
+  
+  # Body weight
+
+  VPlasmaC <- 0.0627  # (%BW) |Fractional volume of plasma (unscaled)
+  
+  VLiverC <- 0.03  # (%BW) |Fractional volume of liver (unscaled)
+  
+  VSC <- 0.6  # (%BW) |Fractional volume of slowly perfused tissues (unscaled)
+  
+  VRC <- (0.33 - VLiverC) # (%BW) |Fractional volume of richly perfused tissues (unscaled)
+  
+  
+  
+  # Partition coefficients for drug, based on Table 2 of paper:
+  
+  # Successful Treatment with Aerosolized DrugP of disease in Rats
+  PLiver <- 0.42  # .42 !for 1 hr 438 !!.42  !130 if 24 hr
+  
+  PSlow <- 0.33  # .33 !for 1 hr 654 !!.33 !1500 if 24 hr
+  
+  PRich <- 0.42 # .42 ! for 1 hr 5541 !!.42 !8461 if 24 hr
+  
+  # For now, metabolism and glomular filtration are the clearnance terms
+  ClurineC <- 0.147  # This is now a clearance term from paper! GFR is 7.2 !(L/h) clearancce by glomelar filtration
+  
+  # Have set liver constant equivalent to GFR to start with since literature suggests metabolism is primary mode of clearance
+  ClLiverC <- 3.26  # 3.26 !!!Paper fit 3.26 !!.269 !(L/h/BW**.75) Clearance from the liver through metabolism
+  
+  # code for calulating the derivative goes here
+  
+  # Scaled kinetic parameters again, may need to use in future model
+  # Vmaxliver = VmaxliverC*BW**.75 !Vmax of drug
+  # Single IV dosing code
+  # IVdose = IVdoseC*BW
+  # IVR = ivon*IVdose/tlen
+  # AIV = Integ(IVR,0.)
+  # ivon = RSW(T __gt tlen,0.0,1.0) !GT means greater than
+  
+  # return all variables in this function's environment
+  as.list(sys.frame(sys.nframe()))
+}
+
+calculate_variables = function(parameters)
+{
+  with(parameters,
+  {
+    # return all variables in this function's environment
+    as.list(sys.frame(sys.nframe()))
+
+  }) # end with
+}
+
+# END!INITIAL
+
+pulse <- function(t, tz, p, w)
+{
+  if(t < tz) return(0)
+  t <- t - tz
+  t <- t %% p
+  return(ifelse(t <= w, 1, 0))
+}
+
+
+# DYNAMIC
+
+# DERIVATIVE
+
+derivative = function(t, y, parameters, ...)
+{
+  with(parameters,
+  {
+    AIV <- y[1]
+    AClurine <- y[2]
+    AMET <- y[3]
+    AUCCV <- y[4]
+    APlasma <- y[5]
+    ALiver <- y[6]
+    BALiver <- y[7]
+    ASlow <- y[8]
+    BAS <- y[9]
+    ARich <- y[10]
+    BARich <- y[11]
+
+    # constants: These "constants" have been converted in order to do monte carlo analysis
+
+    # Scaled Cardiac outputs and blood flows
+    QC <- QCC * (BW ^ 0.75) # Cardiac output
+    
+    QLiver <- QLiverC * QC
+    
+    QS <- QSC * QC 
+    
+    QR <- QRC * QC
+    
+    # Scaled tissue volume, for pbpk model we usually assume density is 1kg/L (density of water
+    VLiver <- VLiverC *  BW # Volume of Liver
+    
+    VPlasma <- VPlasmaC * BW # Volume of plasma
+    
+    VS <- VSC *  BW 
+    
+    VR <- VRC * BW 
+    
+    # Tissue maximum binding capacity
+    BMAXLiv <- BMAXLivC * VLiver # Liver capacity scaled
+    
+    BMAXS <- BMAXSC * VS # Slowly perfused tissue capacity scaled
+    
+    BMAXR <- BMAXRC * VR # Richly perfused tissue capacity scaled
+    
+    
+    # Multiple dosing
+    IVdose <- IVdoseC * BW 
+
+    ivon <- pulse(t, 0, 24, tlen) 
+
+    IVR <- ivon * IVdose / tlen 
+
+    Dailyauccv <- AUCCV / ((t + 1e-33) / 24) 
+
+    CA <- APlasma / VPlasma # arterial/venous concentration
+
+    CA_free <- CA * Funbound 
+
+    MET <- ClLiverC * (BW ^ 0.75) * CA_free # Amount metabolized by the liver
+
+    # Excretion in the Urine
+    # Scaled parameter for GFR and metabolism
+    Clurine <- ClurineC * (BW ^ 0.75) * CA_free # uses the concentration in the plasma as the clearance term
+
+    APLiver <- ALiver / PLiver 
+
+    CVLiver <- ALiver / (PLiver * VLiver) # Venous blood concentration of drug leaving liver
+
+    CLiver <- ALiver / VLiver # Concentration of drug in the liver
+
+    CBLiver <- BALiver / VLiver 
+
+    BLivCap <- BMAXLiv - BALiver # Capacity for binding remaining
+
+    # Compartment for liver: amount bound and capacity for binding
+    RBLiver <- ((-KDLiver) * BALiver) + (KALiver * APLiver * BLivCap) 
+
+    # Compartment for liver: Amount free
+    RALiver <- (QLiver * (CA_free - CVLiver)) + (KDLiver * BALiver) - (KALiver * APLiver * BLivCap) # Amount change in the unbound concentration in the liver
+
+    AtotLiv <- ALiver + BALiver 
+
+    CtotLiv <- AtotLiv / VLiver 
+
+    APS <- ASlow / PSlow 
+
+    CVSlow <- ASlow / (VS * PSlow) # Venous blood concentration of drug leaving the slowly perfused tissues
+
+    CSlow <- ASlow / VS # Concentration of drug in the slowly perfused tissues
+
+    ASCap <- BMAXS - BAS 
+
+    RBS <- ((-KDS) * BAS) + (KAS * APS * ASCap) 
+
+    # Compartment in the slowly perfused tissues
+    RSlow <- (QS * (CA_free - CVSlow)) + (KDS * BAS) - (KAS * APS * ASCap) # Rate of drug change in the slowly perfused tissues
+
+    CtotSlow <- (ASlow + BAS) / VLiver 
+
+    APRich <- ARich / PRich 
+
+    CVRich <- ARich / (VR * PRich) # Venous blood concentration of drug leaving the Richly perfused tissues
+
+    # ***************************Model for drug******!
+
+    # Compartment for the plasma, added in Funbound to account for binding in plasma
+    CV <- ((CVLiver * QLiver) + (CVSlow * QS) + (CVRich * QR)) / QC # amount of free concentration coming from tissues
+
+    Rplasma <- (QC * (CV - CA_free)) + IVR - Clurine - MET # Coming from tissues is entirely free DrugP, IV will be bound and free, urine
+
+    CRich <- ARich / VR # Concentration of drug in the Richly perfused tissues
+
+    CBRich <- BARich / VR 
+
+    BRichCap <- BMAXR - BARich # Capacity for binding remaining
+
+    # Compartment for liver: amount bound and capacity for binding
+    RBRich <- ((-KDR) * BARich) + (KAR * APRich * BRichCap) 
+
+    # Compartment in the richly perfused tissues
+    RRich <- (QR * (CA_free - CVRich)) + (KDR * BARich) - (KAR * APRich * BRichCap) # Rate of drug change in the Richly perfused tissues
+
+    AtotRich <- ARich + BARich 
+
+    CtotRich <- AtotRich / VR 
+
+    # Mass balance
+    Qtotal <- QLiver + QR + QS 
+
+    Qbal <- Qtotal - QC 
+
+    BWorgans <- VLiver + VS + VR 
+
+    TMASSdrug <- APlasma + ALiver + ARich + ASlow + BALiver + BARich + BAS 
+
+    Lossdrug <- AClurine + AMET 
+
+    BAL <- AIV - (Lossdrug + TMASSdrug) 
+
+    KidneyClearance <- AClurine / (AIV + 1e-33) 
+
+    DoseInLiver <- AtotLiv / (AIV + 1e-33) 
+
+
+    list(c(
+      # pack and return derivatives
+      IVR, #Each line of this corresponds to the to be integrated derivative in the code. So this will be AIV
+      Clurine, #AClurine
+      MET, #AMET
+      CV, #AUCCV
+      Rplasma, #APlasma
+      RALiver, #ALiver
+      RBLiver, #BALiver
+      RSlow, #ASlow
+      RBS, #AS
+      RRich, #ARich
+      RBRich   #BARich
+    ), c(
+      # pack and return outputs
+        QCC = unname(QCC)
+      #, QLiverC = unname(QLiverC)
+      #, QSC = unname(QSC)
+      #, QRC = unname(QRC)
+      #, QScalingC = unname(QScalingC)
+      #, BW = unname(BW)
+      #, VPlasmaC = unname(VPlasmaC)
+      #, VLiverC = unname(VLiverC)
+      #, VSC = unname(VSC)
+      #, VRC = unname(VRC)
+      #, VScalingC = unname(VScalingC)
+      #, PLiver = unname(PLiver)
+       #PSlow = unname(PSlow)
+      #, PRich = unname(PRich)
+      #, ClurineC = unname(ClurineC)
+      #, ClLiverC = unname(ClLiverC)
+      #, QC = unname(QC)
+      #, QLiver = unname(QLiver)
+      #, QS = unname(QS)
+      #, QR = unname(QR)
+      #, VLiver = unname(VLiver)
+      #, VPlasma = unname(VPlasma)
+      #, VS = unname(VS)
+      #, VR = unname(VR)
+      #, BMAXLiv = unname(BMAXLiv)
+      #, BMAXS = unname(BMAXS)
+      #, BMAXR = unname(BMAXR)
+      #, IVdose = unname(IVdose)
+      #, ivon = unname(ivon)
+      #, Dailyauccv = unname(Dailyauccv)
+       ,CA = unname(CA)
+      #, CA_free = unname(CA_free)
+      #, APLiver = unname(APLiver)
+      #, CVLiver = unname(CVLiver)
+      #, CLiver = unname(CLiver)
+      #, CBLiver = unname(CBLiver)
+      #, BLivCap = unname(BLivCap)
+      #, AtotLiv = unname(AtotLiv)
+      #, CtotLiv = unname(CtotLiv)
+      #, APS = unname(APS)
+      #, CVSlow = unname(CVSlow)
+      #, CSlow = unname(CSlow)
+      #, ASCap = unname(ASCap)
+      #, CtotSlow = unname(CtotSlow)
+      #, APRich = unname(APRich)
+      #, CVRich = unname(CVRich)
+      #, CRich = unname(CRich)
+      #, CBRich = unname(CBRich)
+      #, BRichCap = unname(BRichCap)
+      #, AtotRich = unname(AtotRich)
+      #, CtotRich = unname(CtotRich)
+      #, Qtotal = unname(Qtotal)
+      , Qbal = unname(Qbal)
+      #, BWorgans = unname(BWorgans)
+      #, TMASSdrug = unname(TMASSdrug)
+      #, Lossdrug = unname(Lossdrug)
+      , BAL = unname(BAL)
+      #, KidneyClearance = unname(KidneyClearance)
+      #, DoseInLiver = unname(DoseInLiver)
+      )
+    ) # end list
+
+  }) # end with
+}
+
+
+
+run_model <- function(parameters)
+{
+  parameters <- calculate_variables(parameters)
+
+  with(parameters, {
+
+    TSTART <- 0.0
+    times <- seq.int(TSTART, TSTOP, CINT)
+
+    y <- c(
+      AIV = 0,
+      AClurine = 0,
+      AMET = 0,
+      AUCCV = 0,
+      APlasma = 0,
+      ALiver = 0,
+      BALiver = 0,
+      ASlow = 0,
+      BAS = 0,
+      ARich = 0,
+      BARich = 0
+      )
+
+    solution <- deSolve::ode(
+      y, 
+      times, 
+      derivative, 
+      parameters, 
+      method = "lsodes" #This implements the Gear method (IALG 2 for ACSLX), any bdf formula would likely work.
+      )
+
+    return(as.matrix(unclass(solution)))
+  })
+}
+
+parameters <- assign_parameters()
+
+solution <- run_model(parameters)
+
+# END ! DERIVATIVE
+# END ! DYNAMIC
+# END ! PROGRAM
+
+
+##if (F)
+#{
+ # parameters <- calculate_variables(parameters)
+  
+ # with(parameters, {
+  #  with(as.data.frame(solution), {
+  
+      # TERMINAL
+
+      # code that is executed once at the end of a simulation run goes here
+      
+      # plot(time, DoseInLiver, type = "l", xlab = "time [units]", ylab = "[m]", main = "[main]")
+      
+      # END ! TERMINAL
+ #   })
+ # })
+#}
+

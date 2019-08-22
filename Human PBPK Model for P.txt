@@ -1,0 +1,99 @@
+A Human Physiologically Based Pharmacokinetic Model for Drug P
+Introduction
+	Drug P is a drug toxic to the kidneys that was studied extensively in the eighties and nineties. A physiologically based pharmacokinetic model was developed to help to assess drug concentration in the liver in order to assess liver toxicity. The model development suggests high tissular binding and likely accumulation in the liver. Although sensitivity analysis, model performance metrics, and monte carlo analysis all suggests either high population variance in distribution of the drug or a great deal of uncertainty in model parameters and structure.
+Methods
+	Physiologically based pharmacokinetic (PBPK) modeling is used to gain insights into the action of the body on a drug. PBPK uses differential equations to model rates of change in amounts of the drugs in different tissues throughout the body and can be used in the drug discovery process. PBPK involves many parameters and therefore sometimes high uncertainty in the output prediction. Monte Carlo simulation is useful for modeling these uncertainties (Peters, 2012).
+	A literature review helps to find justification for setting the many drug specific parameters. Non-drug specific parameters were taken from previously finished PBPK models. These parameters are the cardiac output, liver blood-flow fraction, richly and slowly perfused blood flow fraction, liver volume fraction, and richly and slowly perfused volume fraction  (Yang, 2015). A table of parameters will be provided later in this document.
+Literature Review 
+	Much of what is known of Drug P comes from the eighties and nineties, although a recent review was completed on the pharmacokinetics of several drugs including Drug P (Removed Pre-Publication). In this review, Drug P is described as a second line therapy for disease c as well as treatment for disease d and disease b for patients with disease A. Much of the literature suggests Drug P is toxic to the kidneys. This literature review suggests that oral bioavailability of the drug is low, and accumulation within the tissues is high. Tissue binding was suspected by the literature and therefore to be incorporated into the final model.  
+	In reviewing the literature, one paper in particular gave good evidence for the claim that the drug was getting bound up in the liver. Six men were given Drug P so that radiation could be detected to track where the drug was in the body through scan. This paper found that in these men there was a very large uptake into the liver in particular (Removed Pre Publication).  Empirical renal and metabolic clearance from this paper were used to set clearance directly from plasma.
+	A second confirmation of tissue binding was the distribution of the drug in autopsy for sacrificed rats. A Sprague-Dawley rat model administered IV of rats which were immune suppressed in order to be given disease b before treatment. This study measured tissue concentration for lung, liver, and kidney, and found for IV administration of Drug P that the tisssue concentrations were at least one hundred times as high in concentration as the blood concentration after sacrifice of rats  (Removed Pre-Publication). Similarly another Sprague-Dawley rat model used healthy rats and after IV administration saw an average blood concentration in the rats at around sixteen ng/mL after one day while the tissue concentrations ranged from sixteen-hundred to thirty-two thousand five hundred ng/mL after one day  (Removed Pre Publication).
+	Final confirmation of the assumption of binding was in patients analyzed at autopsy with high tissular concentration of Drug P. Four patients who received Drug P were sampled at autopsy and found to have highest concentration of the drug in the spleen and liver, followed by kidneys, adrenals, and lungs  (Removed Pre-Publication). Another paper looked at autopsy data of 22 patients with disease a further confirming this high concentration  (Removed Pre-Publication). The latter paper was used to set the drug specific binding parameters for maximum binding capacity using the patient with the highest tissue concentration found in the tissues for respective compartments while the former paper was used for model validation.
+	The radioactive tagging, autopsy data in sacrificed rats, and autopsy data in humans provides very compelling evidence that binding must be modeled to accurately represent how the drug is distributed throughout the body. The remaining binding parameters of association and dissociation were set empirically as in previously published PBPK models  (Yoon, 2011). 
+	The dose given to patients, length and amount administered, were set using the paper specific amounts for available blood concentration data. Drugbank indicated that Drug P had a thirty-one percent fraction unbound. Using information about the drug including octonal water and the size of the molecule the software PKSim utilized the algorithm by Rodgers and Rowland to estimate partition coefficients.
+Metabolism
+	Since metabolism was a primary factor in clearance of Drug P a literature review looking for more in depth understanding of metabolites was attempted. However, the characterization of metabolites isn’t complete enough to incorporate into a PBPK model. One paper looked at two metabolites while identifying four more and from these the rescaled clearance turned out to be well below the empirical clearance at less than one liter per hour (Removed Pre-Publication). The much higher empirical clearance tracked much closer to the calibration data and was therefore used instead. 
+ParameterValueSourceQcc: Cardiac Output15.87L/h /kg^.75Yang et al.BW: Body WeightkgPaper SpecificIVDose : Doseng/kgPaper SpecificMetabolism Clearance3.26 L/h/kg^.75RemovedRenal Clearance (before scaling).147 L/h/kg^.75RemovedQL: Liver blood-flow fraction (bf.).24Yang et al.QR: Richly perfused bf.76 Yang et al.QS: Slowly perfused bf.24Yang et al.VL: Liver volume fraction (vf.).026Yang et al.VPlasma: Plasma vf..0435Yang et al.VR: Richly perfused vf..33Yang et al.VS: Slowly perfused vf..6Yang et al.PL: Liver Partition Coefficient (pc.).42PKSimPS: Slowly perfused pc..33PKSimPR: Richly perfused pc..42PKSimBmaxL: Max bound in (mbi) liver 203704 ngRemovedBmaxR: mbi richly perfused8783 ngRemovedBmaxS: mbi slowly perfused2142 ngRemovedKaL: Liver Association Constant (ac)312 l/ng*hacslX optimizedKaR: Richly Perfused ac..2 l/ng*hacslX optimizedKaS: Slowly perfused dc.40 l/ng*hacslX optimizedKdL: Liver dissociation constant (dc)6.1e-4 ng/hacslX optimizedKdR: Richly perfused dc.40 ng/hacslX optimizedKdS: Slowly perfused dc..03 ng/hacslX optimizedStructure of PBPK Model
+	The physiologically based pharmacokinetic model used in this case is called a flow-limited model. Since the drug is a small molecule permeability of tissues will not be a problem for the drug so the rate of distribution of Drug P will depend on rate of perfusion by the blood into tissues. The differential equation used for any given tissue that does not have binding or clearance is given by: Rt = Qt (Cart-Cven). Added to this can be rates of change in the free amount when some amount of drug is bound into the tissues or becomes unbound from the tissues. Clearance can be a part of the differential equation as well.
+	The differential equation for blood involves concentrations from all the different tissues involved in the model. The PBPK model developed can be described by a series of two charts given below. The drug is absorbed directly into the plasma by IV where around seventy percent of it is bound. From there, the drug then distributes through the tissues. Each tissue compartment has binding. The drug eventually will be cleared from the body through renal clearance or metabolism.
+	The PBPK model was developed first using the software acslX with the differential equations and general structure written in csl files and then simulations run in m files where some patient specific parameters such as IV dose and body weight could be reset. IALG was set to 2 in acslX which corresponds to the Gear’s stiff algorithm for solving stiff differential equations.
+	The PBPK model was later translated into the open source programming language R with the equivalent Gear’s Stiff algorithm set as the solver in the package deSolve. Simulation results show very similar results for concentration data. 
+
+One Image Removed
+	
+
+
+
+Data Collection
+	Much of the data was collected from figures using DigitizeIt since many of the papers with kinetic data were from the eighties and nineties. One author was contacted but no longer had access to the data as too much time had passed. One paper had six patients, all which could be taken from the graph, with data collected with HPLC assay and radioactivity reading (Removed). Another paper had twelve patients but only one patient treated with IV could be taken from the graph (Removed). The paper we used for calibration had the largest number of patients in terms of data that we could digitize though the graph, this data was used so that we could set the model for a decently sized fairly homogeneous population (Removed).  From a paper looking at patients with normal renal function and those receiving hemodialysis we collected a set of time course data for a patient with normal renal function, data from a graph from a patient with PCP receiving dialysis, data from a graph of a patient with normal or mildly abnormal renal function, and then a table for the average concentration time data for the nine patients on hemodialysis (Removed). Three patients at different number of doses were collected from figures from a paper that also had some autopsy data (Removed). Finally, from a sixth paper data could be collected on one patient with impaired renal function and one patient without impaired renal function (Removed).
+Monte Carlo Simulation and Sensitivity Analysis
+	Two sources of error can occur in modeling in general where the simulated concentration data dose not match up with the observed data. Uncertainty in true parameter values and observation is one source of error, while physiological parameter variability within populations is another source of error. The Monte Carlo method can aid in assessing the uncertainty within the model and a sensitivity analysis can provide insight into which parameters have the most influence on prediction (Peters, 2012). 
+	Monte Carlo was employed with this PBPK model using acslX, with the function nornrnd() used to generate truncated normal random variables with coefficient of variation of thirty percent of the variables being modeled and support on the distribution from negative three fifths to positive three fifths. The same function was written for R. Fractional volume of plasma and tissues was modeled as normally distributed with coefficient of variation of thirty percent. Many of the other parameters were modeled as distributed log-normally. The parameters which were simulated as log-normally distributed were cardiac output, total volume of body, each partition coefficient, association and dissociation coefficients, length of infusion and clearance constants. See table below for bounds and variance of distributions.
+	Sensitivity analysis was also conducted in acslX and then translated to R using the forward difference approach in acslX. 
+NSC=(?(O?_i-O)/O)/((P_i-P)/P)
+The above equation was used to calculate sensitivity where for each time point the parameter of interest was changed by one percent and then the blood concentration output at both points was calculated. This local sensitivity was performed for each parameter.
+Model Performance
+	Model performance was calculated using Mean Relative Deviation and Average Fold Error.
+Results
+Simulations
+Calibration
+       The model was calibrated using acslX using the following data, the structure of the model used followed from reading through the literature and fitting parameters to attempt a fit to the data and then using acslX to implement Nelder-Mead and Levenberg-Marquardt if Nelder-Mead failed in order to set the binding parameters.
+	The data used to calibrate the model was taken entirely from one paper of patients with disease d as described above.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Validation
+	Validation of the model was performed on the remainder of the data to see whether the model could perform well on data which was not used in the initial calibration phase.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Liver Long Term Simulation
+	Validation of how the model performed was done by looking at autopsy data and accumulation of Drug P in the liver in simulation as compared to on death. Three out of four patients were within the Monte Carlo interval.
+
+Sensitivity Analysis
+	The absolute value maximum sensitivity of each parameter is given below to the third significant digit.
+
+ClLiverC.696ClurineC.0309PRich.00441PSlow.000925PLiver.000976VLiverC.000847VPlasmaC1.62QLiverC.00102QCC1.34Tlen45.3IVdoseC2.89Funbound2.55BMAXRC2.70KDR.938KAR.929BMAXSC.00195KDS.000874KAS.00215BMAXLivC.000891KDLiver.000620KALiver.000907BW.911VRC3.61VSC7.88QRC3.90QSC1.61
+
+
+Model Performance
+
+AFEMRDn12.19011.369527.6809.772931.5026.771646.60712.59551.85115.4666.046879.68367.326210.27882.1829.663793.88510.9481015.6121.7614111.5658.15514126.6959.147141317.1921.8914149.19413.841215.032509.9609
+
+
+Bibliography Removed
+
+Report on Drug Model
+
+
+9
+
+
